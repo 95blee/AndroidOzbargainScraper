@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">OzBargainScraper</string>
+
+    <string name="top_deals_text">Top</string>
+    <string name="new_deals_text">New</string>
+
+    <string name="previous_page">Prev</string>
+    <string name="next_page">Next</string>
+</resources>
