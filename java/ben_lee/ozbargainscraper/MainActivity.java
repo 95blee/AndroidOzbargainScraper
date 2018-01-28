@@ -6,8 +6,14 @@ import android.graphics.Typeface;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.text.Html;
+import android.text.Spannable;
+import android.text.SpannableString;
 import android.text.Spanned;
+import android.text.SpannedString;
+import android.text.TextPaint;
 import android.text.TextUtils;
+import android.text.style.URLSpan;
+import android.text.style.UnderlineSpan;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -24,6 +30,7 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
 import java.io.IOException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -39,6 +46,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int NUM_DEALS_PER_PAGE = 20;
     private static final String DEFAULT_CAT = "Travel";
     public static final String URL_STRING = "ozbargain_url";
+    private static final Spanned EXPIRED_BANNER = Html.fromHtml("<span style='color:#ffffff background-color:red'>Expired</span>");
 
     private String currentCat;
     //If this option is set to true, then expired deals will also be shown
@@ -293,10 +301,15 @@ public class MainActivity extends AppCompatActivity {
                             String dealLink = match.group(1);
                             //Remove any html for dollar signs
                             String dealName = match.group(2).replaceAll("<em class=\"dollar\">|</em>", "");
-                            //If a deal is expired, mark it as such with the string "Expired" in white text on a red background
-                            Spanned expiredSpan = expired ? Html.fromHtml("<span style='color:#ffffff background-color:red'>Expired</span>") : Html.fromHtml("");
-                            Spanned deal = Html.fromHtml("<a href=\"" + ROOT_SITE + dealLink + "\">" + dealName + "</a>");
-                            deals.add((Spanned)TextUtils.concat(expiredSpan, deal));
+                            String dealString = "<a href=\"" + ROOT_SITE + dealLink + "\">" + dealName + "</a>";
+                            Spannable deal = (Spannable) Html.fromHtml(dealString);
+                            formatUrlText(deal);
+                            Spanned spannedDeal = (Spanned) deal;
+                            if (expired) {
+                                //If a deal is expired, mark it as such with the string "Expired" in white text on a red background
+                                spannedDeal = (Spanned) TextUtils.concat(EXPIRED_BANNER, deal);
+                            }
+                            deals.add(spannedDeal);
                         }
 
                     }
@@ -311,6 +324,17 @@ public class MainActivity extends AppCompatActivity {
             //Ignore any exceptions
         }
         return deals;
+    }
+
+    private void formatUrlText(Spannable text) {
+        for (URLSpan u : text.getSpans(0, text.length(), URLSpan.class)) {
+            text.setSpan(new UnderlineSpan() {
+                public void updateDrawState(TextPaint tp) {
+                    tp.setUnderlineText(false);
+                    tp.setColor(getResources().getColor(R.color.colorPrimaryDark));
+                }
+            }, text.getSpanStart(u), text.getSpanEnd(u), 0);
+        }
     }
 
     /*
