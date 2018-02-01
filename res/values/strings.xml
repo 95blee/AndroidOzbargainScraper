@@ -6,4 +6,13 @@
 
     <string name="previous_page">Prev</string>
     <string name="next_page">Next</string>
+
+    <string name="app_bar_settings">Settings</string>
+    <string name="title_activity_settings">Settings</string>
+
+    <!-- Strings related to Settings -->
+    <string name="enable_expire">Show expired deals</string>
+    <string name="default_cat_select">Default category</string>
+    <string name="show_new_pref">Show new deals when opening</string>
+
 </resources>

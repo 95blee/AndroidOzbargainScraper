@@ -2,20 +2,23 @@ package ben_lee.ozbargainscraper;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Typeface;
+import android.preference.PreferenceManager;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.widget.Toolbar;
 import android.text.Html;
 import android.text.Spannable;
-import android.text.SpannableString;
 import android.text.Spanned;
-import android.text.SpannedString;
 import android.text.TextPaint;
 import android.text.TextUtils;
 import android.text.style.URLSpan;
 import android.text.style.UnderlineSpan;
 import android.util.Log;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.AdapterView;
@@ -30,7 +33,6 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
 import java.io.IOException;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -46,6 +48,8 @@ public class MainActivity extends AppCompatActivity {
     private static final int NUM_DEALS_PER_PAGE = 20;
     private static final String DEFAULT_CAT = "Travel";
     public static final String URL_STRING = "ozbargain_url";
+    public static final String CATEGORIES_KEY = "pref_cat_list";
+    public static final String CATEGORIES_LINK_KEY = "pref_cat_link_list";
     private static final Spanned EXPIRED_BANNER = Html.fromHtml("<span style='color:#ffffff background-color:red'>Expired</span>");
 
     private String currentCat;
@@ -57,6 +61,7 @@ public class MainActivity extends AppCompatActivity {
 
     //Maps the name of the category (e.g. travel) to the subdirectory on the deals site (/cat/travel)
     private HashMap<String, String> categoryNameLinkMap;
+    public static List<String> categories;
 
     private List<Spanned> deals;
     private ListView dealsList;
@@ -66,16 +71,47 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        Toolbar toolbar = (Toolbar) findViewById(R.id.main_activity_toolbar);
+        setSupportActionBar(toolbar);
         initVarsAndViews();
         updateDealsView();
     }
 
+    @Override
+    public void onResume() {
+        super.onResume();
+        checkExpiredSetting();
+        updateDealsView();
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.action_bar_options, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch(item.getItemId()) {
+            case R.id.app_bar_settings:
+                //show settings page
+                Intent showSettings = new Intent(this, SettingsActivity.class);
+                startActivity(showSettings);
+                return true;
+        }
+        return false;
+    }
+
     private void initVarsAndViews() {
+        /*
         showExpired = true;
-        showNewDeals = false;
-        currentPage = 0;
         currentCat = DEFAULT_CAT;
+        showNewDeals = false;
+        */
+        readPreferences();
+        currentPage = 0;
         categoryNameLinkMap = new HashMap<>(NUM_CATS);
+        categories = new ArrayList<>(NUM_CATS);
         dealsList = findViewById(R.id.deals);
         deals = new ArrayList<>(NUM_DEALS_PER_PAGE);
         dealsAdapter = new ArrayAdapter<>(this, R.layout.deal_view, deals);
@@ -87,12 +123,21 @@ public class MainActivity extends AppCompatActivity {
         addPageButtonListeners();
     }
 
+    private void readPreferences() {
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(this);
+        showExpired = preferences.getBoolean(SettingsActivity.SHOW_EXPIRED_PREF, true);
+        currentCat = preferences.getString(SettingsActivity.DEF_CAT_PREF, DEFAULT_CAT);
+        showNewDeals = preferences.getBoolean(SettingsActivity.SHOW_NEW_PREF, false);
+    }
+
+    private void checkExpiredSetting() {
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(this);
+        showExpired = preferences.getBoolean(SettingsActivity.SHOW_EXPIRED_PREF, true);
+    }
+
     //Set up the dropdown list that allows a user to choose which category of deals to view
     private void setSpinner() {
         Spinner catChoices = findViewById(R.id.cat_select);
-        //Create a list of all of the names of categories available
-        final List<String> categories = new ArrayList<>(categoryNameLinkMap.keySet());
-        Collections.sort(categories);
         //Create the adapter that the spinner will use from the list of categories
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, categories);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -116,8 +161,8 @@ public class MainActivity extends AppCompatActivity {
             public void onNothingSelected(AdapterView<?> adapterView) {
             }
         });
-        //Set the default category to be currentCat
-        catChoices.setSelection(categories.indexOf(DEFAULT_CAT));
+        //Set the selected category to be currentCat
+        catChoices.setSelection(categories.indexOf(currentCat));
     }
 
     /*
@@ -127,8 +172,12 @@ public class MainActivity extends AppCompatActivity {
     private void addSelectNewTopListeners() {
         final TextView topDealsTextView = findViewById(R.id.select_top);
         final TextView newDealsTextView = findViewById(R.id.select_new);
-        //The default selection is to see top deals so bold the text in the "Top" textview
-        topDealsTextView.setTypeface(topDealsTextView.getTypeface(), Typeface.BOLD);
+        //Make whatever is chosen between top deals or new deals the bolded word
+        if (showNewDeals) {
+            newDealsTextView.setTypeface(newDealsTextView.getTypeface(), Typeface.BOLD);
+        } else {
+            topDealsTextView.setTypeface(topDealsTextView.getTypeface(), Typeface.BOLD);
+        }
         topDealsTextView.setOnClickListener(new OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -343,6 +392,19 @@ public class MainActivity extends AppCompatActivity {
     is sent.
      */
     private void getCategories() {
+        final String categorySeparator = ","; //used to delimit categories: assumes the site does not use this in their categories
+        final SharedPreferences sharedPrefs = getPreferences(Context.MODE_PRIVATE);
+        String catString = sharedPrefs.getString(CATEGORIES_KEY, null);
+        String catLinkString = sharedPrefs.getString(CATEGORIES_LINK_KEY, null);
+        if (catString != null && catLinkString != null) {
+            String[] categoriesArray = catString.split(categorySeparator); //make sure the categorySeparator is not a regex metacharacter
+            String[] categoryLinks = catLinkString.split(categorySeparator);
+            for (int i=0; i<categoriesArray.length; i++) {
+                categories.add(categoriesArray[i]);
+                categoryNameLinkMap.put(categoriesArray[i], categoryLinks[i]);
+            }
+            return;
+        }
         Thread newThread = new Thread(new Runnable() {
             @Override
             public void run() {
@@ -371,6 +433,8 @@ public class MainActivity extends AppCompatActivity {
                 Pattern catMatch = Pattern.compile("a href=\"([^\"]*)\">(.*)</a>");
                 if (page != null) {
                     Elements links = page.select("a[href~=/cat/.*]");
+                    StringBuilder categoryString= new StringBuilder("");
+                    StringBuilder categoryLinkString= new StringBuilder("");
                     for (Element link : links) {
                         String catString = link.toString();
                         Matcher match = catMatch.matcher(catString);
@@ -379,8 +443,19 @@ public class MainActivity extends AppCompatActivity {
                             String categoryLink = match.group(1);
                             //Map the name of the category to the subdirectory of the site.
                             categoryNameLinkMap.put(categoryName, categoryLink);
+                            categories.add(categoryName);
+                            if (!categoryString.toString().equals("")) {
+                                categoryString.append(categorySeparator);
+                                categoryLinkString.append(categorySeparator);
+                            }
+                            categoryString.append(categoryName);
+                            categoryLinkString.append(categoryLink);
                         }
                     }
+                    SharedPreferences.Editor prefEditor = sharedPrefs.edit();
+                    prefEditor.putString(CATEGORIES_KEY, categoryString.toString());
+                    prefEditor.putString(CATEGORIES_LINK_KEY, categoryLinkString.toString());
+                    prefEditor.apply();
                 }
             }
         });

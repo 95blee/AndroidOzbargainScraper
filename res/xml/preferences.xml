@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <SwitchPreference
+        android:key="pref_show_expire"
+        android:title="@string/enable_expire"
+        android:defaultValue="true"/>
+    <SwitchPreference
+        android:key="pref_show_new"
+        android:title="@string/show_new_pref"
+        android:defaultValue="false" />
+    <ListPreference
+        android:key="pref_default_cat"
+        android:title="@string/default_cat_select"
+        android:summary="%s"
+        />
+</PreferenceScreen>

@@ -8,6 +8,7 @@
     android:textSize="20sp"
     android:paddingVertical="5dp"
     android:clickable="true"
-    android:onClick="dealClicked">
+    android:onClick="dealClicked"
+    android:paddingHorizontal="5dp">
 
 </TextView>
