@@ -1,10 +1,14 @@
 package ben_lee.ozbargainscraper;
 
+import android.app.AlertDialog;
+import android.app.Dialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Typeface;
 import android.preference.PreferenceManager;
+import android.support.v4.app.DialogFragment;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.Toolbar;
@@ -74,14 +78,22 @@ public class MainActivity extends AppCompatActivity {
         Toolbar toolbar = (Toolbar) findViewById(R.id.main_activity_toolbar);
         setSupportActionBar(toolbar);
         initVarsAndViews();
-        updateDealsView();
+        try {
+            updateDealsView();
+        } catch (NoMoreDealsException e) {
+            showNoDealsAlert();
+        }
     }
 
     @Override
     public void onResume() {
         super.onResume();
         checkExpiredSetting();
-        updateDealsView();
+        try {
+            updateDealsView();
+        } catch (NoMoreDealsException e) {
+            showNoDealsAlert();
+        }
     }
 
     @Override
@@ -155,7 +167,11 @@ public class MainActivity extends AppCompatActivity {
                 }
                 currentCat = newCat;
                 currentPage = 0;
-                updateDealsView();
+                try {
+                    updateDealsView();
+                } catch (NoMoreDealsException e) {
+                    showNoDealsAlert();
+                }
             }
             @Override
             public void onNothingSelected(AdapterView<?> adapterView) {
@@ -188,7 +204,11 @@ public class MainActivity extends AppCompatActivity {
                 makeSelectedBold(topDealsTextView, newDealsTextView);
                 currentPage = 0;
                 showNewDeals = false;
-                updateDealsView();
+                try {
+                    updateDealsView();
+                } catch (NoMoreDealsException e) {
+                    showNoDealsAlert();
+                }
             }
         });
         newDealsTextView.setOnClickListener(new OnClickListener() {
@@ -200,7 +220,11 @@ public class MainActivity extends AppCompatActivity {
                 makeSelectedBold(newDealsTextView, topDealsTextView);
                 currentPage = 0;
                 showNewDeals = true;
-                updateDealsView();
+                try {
+                    updateDealsView();
+                } catch (NoMoreDealsException e) {
+                    showNoDealsAlert();
+                }
             }
         });
     }
@@ -226,7 +250,11 @@ public class MainActivity extends AppCompatActivity {
                     return;
                 }
                 currentPage--;
-                updateDealsView();
+                try {
+                    updateDealsView();
+                } catch (NoMoreDealsException e) {
+                    currentPage++;
+                }
             }
         });
         nextPage.setOnClickListener(new OnClickListener() {
@@ -237,7 +265,11 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View view) {
                 currentPage++;
-                updateDealsView();
+                try {
+                    updateDealsView();
+                } catch (NoMoreDealsException e) {
+                    currentPage--;
+                }
             }
         });
     }
@@ -255,8 +287,11 @@ public class MainActivity extends AppCompatActivity {
     Get new deals from the website and display them on the screen. The actionbar that is on the
     top of the screen will update to reflect what kind of deals are being displayed.
      */
-    private void updateDealsView() {
+    private void updateDealsView() throws NoMoreDealsException {
         deals = getDeals();
+        if (deals.size() < 1) {
+            throw new NoMoreDealsException();
+        }
         //Update the action bar.
         String title = currentCat + " - ";
         title += showNewDeals ? "New" : "Top";
@@ -326,6 +361,7 @@ public class MainActivity extends AppCompatActivity {
                 try {
                     page = Jsoup.connect(connectLink).get();
                 } catch (org.jsoup.HttpStatusException httpError) {
+                    showNoDealsAlert();
                     //If there is a 404 error, catch it and don't do anything
                     //TODO: maybe make a popup telling user there are no more deals?
                 } catch (IOException e) {
@@ -371,6 +407,9 @@ public class MainActivity extends AppCompatActivity {
             newThread.join();
         } catch (InterruptedException e) {
             //Ignore any exceptions
+        }
+        if (deals.size() < 1) {
+            showNoDealsAlert();
         }
         return deals;
     }
@@ -466,5 +505,27 @@ public class MainActivity extends AppCompatActivity {
         } catch (InterruptedException e) {
             //Ignore any exceptions
         }
+    }
+
+    private void showNoDealsAlert() {
+        DialogFragment noDealsAlert = new NoMoreDealsAlert();
+        noDealsAlert.show(getSupportFragmentManager(), "No more deals");
+    }
+
+    public static class NoMoreDealsAlert extends DialogFragment {
+        @Override
+        public Dialog onCreateDialog(Bundle savedInstanceState) {
+            AlertDialog.Builder alertBuilder = new AlertDialog.Builder(getActivity());
+            alertBuilder.setMessage("There are no more deals to show at this time").setPositiveButton("Ok", new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialogInterface, int i) {
+                    //do nothing
+                }
+            });
+            return alertBuilder.create();
+        }
+    }
+
+    public static class NoMoreDealsException extends Exception {
     }
 }
